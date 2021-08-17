@@ -1,0 +1,182 @@
+-- Bixi 
+
+-- QUESTION 1
+	
+    #1The total number of trips for the year of 2016.
+    #The total number of trips for the year of 2017.
+
+SELECT COUNT(id) as numTrips, year(start_date) as year
+FROM trips
+GROUP BY year(start_date);
+
+-- The total number of trips for the year of 2016 broken-down by month.
+SELECT COUNT(id) as numTrips, year(start_date) as year, month(start_date) as month
+FROM trips
+GROUP BY year(start_date), month(start_date)
+HAVING year = 2016
+ORDER BY month ASC;
+
+-- The total number of trips for the year of 2017 broken-down by month
+SELECT COUNT(id) as totalTrips, year(start_date) as year, month(start_date) as month
+FROM trips
+GROUP BY year(start_date), month(start_date)
+HAVING year = 2017
+ORDER BY month ASC;
+
+-- The average number of trips a day for each year-month combination in the dataset.
+
+SELECT 
+	year(start_date) as year, month(start_date) as month, 
+	COUNT(*)/ (COUNT(DISTINCT DAY(start_date))) AS avg_trips_per_day
+FROM trips
+GROUP BY year, month
+ORDER BY year, month ASC;
+
+-- Save your query results from the previous question (Q1.5) by creating a table called working_table1.
+
+CREATE TABLE working_table1 AS
+SELECT 
+	year(start_date) as year, month(start_date) as month, 
+	COUNT(*)/ (COUNT(DISTINCT DAY(start_date))) AS avg_trips_per_day
+FROM trips
+GROUP BY year, month
+ORDER BY year, month ASC;
+
+
+
+-- QUESTION 2
+-- The total number of trips in the year 2017 broken-down by membership status (member/non-member).
+
+SELECT COUNT(id) as numTrips, year(start_date) as year, is_member
+FROM trips
+GROUP BY year(start_date), is_member
+HAVING year = 2017;
+
+-- The fraction of total trips that were done by members for the year of 2017 broken-down by month.
+
+
+
+SELECT month(start_date) as month, year(start_date) as year,SUM(is_member) /COUNT(*) as tripsMembs
+FROM trips
+GROUP BY month, year
+HAVING year = 2017;
+
+SELECT sum(is_member)
+FROM trips;
+
+
+-- Question 4
+
+-- 1.	What are the names of the 5 most popular starting stations? Solve this problem without using a subquery.
+
+SELECT name, code, COUNT(*) as numTrips
+FROM stations
+INNER JOIN trips
+ON trips.start_station_code = stations.code
+GROUP BY stations.name, stations.code
+ORDER BY numTrips DESC
+LIMIT 5;
+
+-- 2.	Solve the same question as Q4.1, but now use a subquery. Is there a difference in query run time between 4.1 and 4.2?
+
+SELECT name, numTrips, code 
+FROM stations
+INNER JOIN
+		(
+		SELECT COUNT(*) as numTrips, start_station_code
+        FROM trips
+        GROUP BY start_station_code
+        ORDER BY numTrips DESC
+        LIMIT 5
+        ) as TripCounts
+	ON start_station_code = stations.code;
+	
+	-- using a subquery runs a lot faster
+    
+-- QUESTION 5
+
+CREATE table working_time_of_day AS
+SELECT start_date, start_station_code, 
+	CASE
+       WHEN HOUR(start_date) BETWEEN 7 AND 11 THEN "morning"
+       WHEN HOUR(start_date) BETWEEN 12 AND 16 THEN "afternoon"
+       WHEN HOUR(start_date) BETWEEN 17 AND 21 THEN "evening"
+       ELSE "night"
+	END AS "time_of_day"
+FROM trips
+WHERE start_station_code = 6100;
+
+SELECT COUNT(*) as numStarts, time_of_day
+FROM working_time_of_day
+GROUP BY time_of_day;
+
+-- END times
+
+CREATE table working_time_of_day2 AS
+SELECT end_date, end_station_code,
+	CASE
+       WHEN HOUR(end_date) BETWEEN 7 AND 11 THEN "morning"
+       WHEN HOUR(end_date) BETWEEN 12 AND 16 THEN "afternoon"
+       WHEN HOUR(end_date) BETWEEN 17 AND 21 THEN "evening"
+       ELSE "night"
+	END AS "time_of_day"
+FROM trips
+WHERE end_station_code = 6100;
+
+SELECT COUNT(*) as numEnds, time_of_day
+FROM working_time_of_day2
+GROUP BY time_of_day;
+
+-- station 6100 is the station number for Mackay/ de Maisonneuve 
+-- QUESTION 6 
+       
+-- First, write a query that counts the number of starting trips per station
+
+SELECT code, name, numberTrips
+FROM stations
+INNER JOIN
+	(	
+	SELECT start_station_code, COUNT(*) as numberTrips
+	FROM trips
+	GROUP BY start_station_code
+    ) AS tripsCounts
+ON start_station_code = stations.code 
+ORDER BY numberTrips DESC;
+
+
+
+-- Second, write a query that counts, for each station, the number of round trips
+
+SELECT start_station_code, end_station_code, COUNT(*) as numRoundtrips
+FROM trips
+WHERE start_station_code = end_station_code
+GROUP BY start_station_code, end_station_code
+ORDER BY numRoundTrips DESC;
+
+
+-- Combine the above queries and calculate the fraction of round trips to the total number of starting trips for each station.
+
+-- Filter down to stations with at least 500 trips originating from them and having at least 10% of their trips as round trips.
+
+
+
+SELECT stations.code, stations.name, fraction
+FROM stations
+INNER JOIN
+	(
+	SELECT trips.start_station_code, COUNT(id), numRoundtrips/COUNT(id) AS fraction
+	FROM trips
+	INNER JOIN
+		(
+        SELECT trips.start_station_code, COUNT(*) as numRoundtrips
+		FROM trips
+		WHERE start_station_code = end_station_code
+		GROUP BY start_station_code
+		) as RoundTrips
+	ON trips.start_station_code = RoundTrips.start_station_code
+    GROUP BY start_station_code
+	HAVING COUNT(id) >= 500 AND fraction >= 0.10) AS fract
+ON  stations.code = start_station_code
+ORDER BY fraction DESC;
+
+-- fraction refers to fraction of round trip. 
